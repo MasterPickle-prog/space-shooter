@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Shooter</title>
+    <link rel="stylesheet" href="spacestyle.css">
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div>Score: <span id="score">0</span></div>
+            <div>Lives: <span id="lives">5</span></div>
+            <div id="powerupDisplay" style="margin-top: 10px; display: none;">
+                <span style="color: #ffff00;">⚡ </span><span id="powerupName"></span>
+            </div>
+        </div>
+        <div id="legend">
+            <div style="font-weight: bold; margin-bottom: 5px;">ENEMIES:</div>
+            <div class="legend-item" id="legend-red"><span class="enemy-color" style="background: #ff0000;"></span>Red: Basic (10 pts)</div>
+            <div class="legend-item locked" id="legend-yellow"><span class="enemy-color" style="background: #ffff00;"></span>Yellow: Targets you (15 pts)</div>
+            <div class="legend-item locked" id="legend-darkBlue"><span class="enemy-color" style="background: #0000aa;"></span>Blue: Fast & small (20 pts)</div>
+            <div class="legend-item locked" id="legend-green"><span class="enemy-color" style="background: #00ff00;"></span>Green: Shoots back! (25 pts)</div>
+            <div class="legend-item locked" id="legend-grey"><span class="enemy-color" style="background: #888888;"></span>Grey: Tank - 3 HP (30 pts)</div>
+            <div class="legend-item locked" id="legend-pink"><span class="enemy-color" style="background: #ff69b4;"></span>Pink: Explodes! (35 pts)</div>
+            <div class="legend-item locked" id="legend-purple"><span class="enemy-color" style="background: #9900ff;"></span>Purple: Heavy fire (40 pts)</div>
+        </div>
+        <div id="gameOver">
+            <div>GAME OVER</div>
+            <div style="font-size: 24px; margin-top: 10px;">Final Score: <span id="finalScore">0</span></div>
+            <button id="restartBtn">RESTART</button>
+        </div>
+        <div id="titleScreen">
+            <h1>SPACE SHOOTER</h1>
+            <div class="subtitle">Defend Earth from the Alien Invasion!</div>
+            <button id="startBtn">START GAME</button>
+            <div class="controls">
+                <div><strong>CONTROLS:</strong></div>
+                <div>⬆️ ⬇️ ⬅️ ➡️ Arrow Keys - Move</div>
+                <div>Auto-Fire - Shoots automatically!</div>
+            </div>
+        </div>
+    </div>
+    
+    <button id="quitBtn">QUIT TO TITLE</button>
+
+    <script src="shooter.js"></script>
+</body>
+</html>
