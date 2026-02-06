@@ -1,4 +1,4 @@
-       const canvas = document.getElementById('gameCanvas');
+   const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const container = document.getElementById('gameContainer');
         
@@ -7,11 +7,22 @@
 
         
         let score = 0;
-        let lives = 5;
+        let lives = 3;
         let gameRunning = false;
         let gameStarted = false;
         let keys = {};
         let gameTime = 0; 
+        let roundNumber = 0; 
+        let upgradesPending = false;
+        let obtainedUpgrades = []; 
+        
+        
+        let fireRateMultiplier = 1;
+        let playerSizeMultiplier = 1;
+        let hasMinions = false;
+        let hasGrenades = false;
+        let hasCommander = false;
+        let shootDirection = { x: 0, y: -1 }; 
 
         
         const player = {
@@ -27,6 +38,7 @@
         const bulletSpeed = 7;
         let lastShot = 0;
         const shootDelay = 1000; 
+        let bulletAngle = 0; 
 
         
         let enemies = [];
@@ -41,6 +53,35 @@
         const powerupSpeed = 2;
         let activePowerups = {}; 
         let powerupEndTime = 0;
+        
+        
+        const availableUpgrades = [
+            {
+                id: 'firerate',
+                name: 'Fire Rate',
+                description: 'Doubles your current fire rate'
+            },
+            {
+                id: 'tanky',
+                name: 'Tanky',
+                description: 'Get +1 life. Ship grows 1.05x bigger'
+            },
+            {
+                id: 'minions',
+                name: 'Minions',
+                description: 'Two small shooters assist you on each side'
+            },
+            {
+                id: 'grenade',
+                name: 'Grenade Launcher',
+                description: '20% chance to fire explosive grenades'
+            },
+            {
+                id: 'commander',
+                name: 'Commander',
+                description: 'Aim your shots left/right with A and D keys'
+            }
+        ];
         
         const powerupTypes = {
             rapidFire: { 
@@ -101,6 +142,20 @@
         
         document.addEventListener('keydown', (e) => {
             keys[e.key] = true;
+            
+            
+            if (hasCommander) {
+                if (e.key === 'ArrowUp') {
+                    shootDirection = { x: 0, y: -1 };
+                } else if (e.key === 'ArrowDown') {
+                    shootDirection = { x: 0, y: 1 };
+                } else if (e.key === 'ArrowLeft') {
+                    shootDirection = { x: -1, y: 0 };
+                } else if (e.key === 'ArrowRight') {
+                    shootDirection = { x: 1, y: 0 };
+                }
+            }
+            
             if (e.key === ' ') {
                 e.preventDefault();
             }
@@ -131,10 +186,21 @@
             activePowerups = {};
             powerupEndTime = 0;
             
+            
+            roundNumber = 0;
+            obtainedUpgrades = [];
+            fireRateMultiplier = 1;
+            playerSizeMultiplier = 1;
+            hasMinions = false;
+            hasGrenades = false;
+            hasCommander = false;
+            shootDirection = { x: 0, y: -1 };
+            
             gameTime = 0;
             gameStarted = true;
-            gameRunning = true;
-            gameLoop();
+            
+            
+            showUpgradeScreen();
         }
         
         function quitToTitle() {
@@ -149,6 +215,14 @@
             player.x = canvas.width / 2 - 20;
             player.y = canvas.height - 80;
             gameTime = 0;
+            roundNumber = 0;
+            obtainedUpgrades = [];
+            fireRateMultiplier = 1;
+            playerSizeMultiplier = 1;
+            hasMinions = false;
+            hasGrenades = false;
+            hasCommander = false;
+            shootDirection = { x: 0, y: -1 };
             gameRunning = false;
             gameStarted = false;
             document.getElementById('gameOver').style.display = 'none';
@@ -157,38 +231,185 @@
             updateUI();
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
+        
+        function showUpgradeScreen() {
+            gameRunning = false;
+            upgradesPending = true;
+            document.getElementById('upgradeScreen').style.display = 'flex';
+            
+            
+            const remaining = availableUpgrades.filter(u => !obtainedUpgrades.includes(u.id));
+            
+            console.log('Obtained upgrades:', obtainedUpgrades);
+            console.log('Remaining upgrades:', remaining.map(u => u.id));
+            
+            const selected = [];
+            
+            while (selected.length < 3 && remaining.length > 0) {
+                const index = Math.floor(Math.random() * remaining.length);
+                selected.push(remaining[index]);
+                remaining.splice(index, 1);
+            }
+            
+            
+            while (selected.length < 3) {
+                selected.push({
+                    id: 'maxed',
+                    name: 'Fully Upgraded!',
+                    description: 'You have unlocked all available upgrades'
+                });
+            }
+            
+            
+            const container = document.getElementById('upgradeCards');
+            container.innerHTML = '';
+            
+            selected.forEach(upgrade => {
+                const card = document.createElement('div');
+                card.className = 'upgrade-card';
+                if (upgrade.id === 'maxed') {
+                    card.className += ' upgrade-card-disabled';
+                }
+                card.innerHTML = `
+                    <h3>${upgrade.name}</h3>
+                    <p>${upgrade.description}</p>
+                `;
+                if (upgrade.id !== 'maxed') {
+                    card.onclick = () => selectUpgrade(upgrade.id);
+                }
+                container.appendChild(card);
+            });
+        }
+        
+        function selectUpgrade(upgradeId) {
+            obtainedUpgrades.push(upgradeId);
+            
+            
+            switch(upgradeId) {
+                case 'firerate':
+                    fireRateMultiplier *= 2;
+                    break;
+                case 'tanky':
+                    lives++;
+                    playerSizeMultiplier *= 1.05;
+                    updateUI();
+                    break;
+                case 'minions':
+                    hasMinions = true;
+                    break;
+                case 'grenade':
+                    hasGrenades = true;
+                    break;
+                case 'commander':
+                    hasCommander = true;
+                    break;
+            }
+            
+            
+            document.getElementById('upgradeScreen').style.display = 'none';
+            upgradesPending = false;
+            gameRunning = true;
+            gameLoop();
+        }
 
         function drawPlayer() {
+            const currentWidth = player.width * playerSizeMultiplier;
+            const currentHeight = player.height * playerSizeMultiplier;
+            
             
             if (activePowerups.shield) {
                 ctx.strokeStyle = '#00ffff';
                 ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.arc(player.x + player.width / 2, player.y + player.height / 2, player.width, 0, Math.PI * 2);
+                ctx.arc(player.x + currentWidth / 2, player.y + currentHeight / 2, currentWidth, 0, Math.PI * 2);
                 ctx.stroke();
             }
             
             
             ctx.fillStyle = '#00ffff';
             ctx.beginPath();
-            ctx.moveTo(player.x + player.width / 2, player.y);
-            ctx.lineTo(player.x, player.y + player.height);
-            ctx.lineTo(player.x + player.width, player.y + player.height);
+            ctx.moveTo(player.x + currentWidth / 2, player.y);
+            ctx.lineTo(player.x, player.y + currentHeight);
+            ctx.lineTo(player.x + currentWidth, player.y + currentHeight);
             ctx.closePath();
             ctx.fill();
 
             
             ctx.fillStyle = '#0088ff';
             ctx.beginPath();
-            ctx.arc(player.x + player.width / 2, player.y + player.height / 2, 8, 0, Math.PI * 2);
+            ctx.arc(player.x + currentWidth / 2, player.y + currentHeight / 2, 8 * playerSizeMultiplier, 0, Math.PI * 2);
             ctx.fill();
+            
+            
+            ctx.save();
+            
+            const cannonX = player.x + currentWidth / 2;
+            const cannonY = player.y + currentHeight / 3;
+            
+            
+            ctx.translate(cannonX, cannonY);
+            ctx.rotate(bulletAngle);
+            
+            
+            ctx.fillStyle = '#ffaa00';
+            const cannonWidth = 6 * playerSizeMultiplier;
+            const cannonLength = 15 * playerSizeMultiplier;
+            ctx.fillRect(-cannonWidth / 2, -cannonLength, cannonWidth, cannonLength);
+            
+            
+            ctx.fillStyle = '#ff6600';
+            const tipSize = 4 * playerSizeMultiplier;
+            ctx.fillRect(-tipSize / 2, -cannonLength - 2, tipSize, tipSize);
+            
+            ctx.restore();
+            
+            
+            if (hasMinions) {
+                const minionSize = 20;
+                const minionOffset = 50;
+                
+                
+                ctx.fillStyle = '#00aaaa';
+                ctx.beginPath();
+                ctx.moveTo(player.x - minionOffset + minionSize / 2, player.y + 10);
+                ctx.lineTo(player.x - minionOffset, player.y + minionSize + 10);
+                ctx.lineTo(player.x - minionOffset + minionSize, player.y + minionSize + 10);
+                ctx.closePath();
+                ctx.fill();
+                
+                
+                ctx.beginPath();
+                ctx.moveTo(player.x + currentWidth + minionOffset + minionSize / 2, player.y + 10);
+                ctx.lineTo(player.x + currentWidth + minionOffset, player.y + minionSize + 10);
+                ctx.lineTo(player.x + currentWidth + minionOffset + minionSize, player.y + minionSize + 10);
+                ctx.closePath();
+                ctx.fill();
+            }
         }
 
         function drawBullets() {
             
-            ctx.fillStyle = '#ffff00';
             bullets.forEach(bullet => {
-                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                if (bullet.isGrenade) {
+                    ctx.fillStyle = '#ff6600';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x + bullet.width / 2, bullet.y + bullet.height / 2, bullet.width / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.save();
+                    
+                    
+                    if (bullet.angle !== undefined) {
+                        ctx.translate(bullet.x + bullet.width / 2, bullet.y + bullet.height / 2);
+                        ctx.rotate(bullet.angle);
+                        ctx.translate(-(bullet.x + bullet.width / 2), -(bullet.y + bullet.height / 2));
+                    }
+                    
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                    
+                    ctx.restore();
+                }
             });
             
             
@@ -270,52 +491,76 @@
             if (keys['ArrowDown'] && player.y < canvas.height - player.height) {
                 player.y += currentSpeed;
             }
+            
+            
+            if (hasCommander) {
+                const maxAngle = Math.PI / 4; 
+                if (keys['a'] || keys['A']) {
+                    bulletAngle = Math.max(bulletAngle - 0.05, -maxAngle);
+                }
+                if (keys['d'] || keys['D']) {
+                    bulletAngle = Math.min(bulletAngle + 0.05, maxAngle);
+                }
+                
+                
+                if (!keys['a'] && !keys['A'] && !keys['d'] && !keys['D']) {
+                    if (Math.abs(bulletAngle) > 0.01) {
+                        bulletAngle *= 0.9;
+                    } else {
+                        bulletAngle = 0;
+                    }
+                }
+            } else {
+                
+                bulletAngle = 0;
+            }
         }
 
         function shoot() {
             const now = Date.now();
-            const currentShootDelay = activePowerups.rapidFire ? powerupTypes.rapidFire.shootDelay : shootDelay;
+            const baseDelay = activePowerups.rapidFire ? powerupTypes.rapidFire.shootDelay : shootDelay;
+            const currentShootDelay = baseDelay / fireRateMultiplier;
             
             if (now - lastShot > currentShootDelay) {
+                const currentWidth = player.width * playerSizeMultiplier;
+                const isGrenade = hasGrenades && Math.random() < 0.2;
+                
                 if (activePowerups.multiShot) {
                     
-                    bullets.push({
-                        x: player.x + player.width / 2 - 2,
-                        y: player.y,
-                        width: 4,
-                        height: 15,
-                        vx: 0,
-                        vy: -bulletSpeed
-                    });
-                    bullets.push({
-                        x: player.x + player.width / 2 - 2,
-                        y: player.y,
-                        width: 4,
-                        height: 15,
-                        vx: -2,
-                        vy: -bulletSpeed
-                    });
-                    bullets.push({
-                        x: player.x + player.width / 2 - 2,
-                        y: player.y,
-                        width: 4,
-                        height: 15,
-                        vx: 2,
-                        vy: -bulletSpeed
-                    });
+                    createBullet(player.x + currentWidth / 2 - 2, player.y, 0, isGrenade);
+                    createBullet(player.x + currentWidth / 2 - 2, player.y, -2, isGrenade);
+                    createBullet(player.x + currentWidth / 2 - 2, player.y, 2, isGrenade);
                 } else {
                     
-                    bullets.push({
-                        x: player.x + player.width / 2 - 2,
-                        y: player.y,
-                        width: 4,
-                        height: 15,
-                        vx: 0,
-                        vy: -bulletSpeed
-                    });
+                    createBullet(player.x + currentWidth / 2 - 2, player.y, 0, isGrenade);
                 }
+                
+                
+                if (hasMinions) {
+                    const minionSize = 20;
+                    const minionOffset = 50;
+                    createBullet(player.x - minionOffset + minionSize / 2 - 2, player.y + 10, 0, false);
+                    createBullet(player.x + currentWidth + minionOffset + minionSize / 2 - 2, player.y + 10, 0, false);
+                }
+                
                 lastShot = now;
             }
+        }
+        
+        function createBullet(x, y, offsetX, isGrenade) {
+            
+            const angle = bulletAngle;
+            
+            bullets.push({
+                x: x,
+                y: y,
+                width: isGrenade ? 8 : 4,
+                height: isGrenade ? 8 : 15,
+                vx: Math.sin(angle) * bulletSpeed + offsetX,
+                vy: -Math.cos(angle) * bulletSpeed,
+                isGrenade: isGrenade,
+                angle: angle 
+            });
         }
 
         function updateBullets() {
@@ -323,7 +568,8 @@
             bullets = bullets.filter(bullet => {
                 bullet.y += bullet.vy || -bulletSpeed;
                 bullet.x += bullet.vx || 0;
-                return bullet.y > 0 && bullet.x > -10 && bullet.x < canvas.width + 10;
+                return bullet.y > -50 && bullet.y < canvas.height + 50 && 
+                       bullet.x > -50 && bullet.x < canvas.width + 50;
             });
             
             
@@ -589,6 +835,35 @@
                         bullets.splice(bulletIndex, 1);
                         
                         
+                        if (bullet.isGrenade) {
+                            const explosionRadius = 100; 
+                            const explosionX = bullet.x + bullet.width / 2;
+                            const explosionY = bullet.y + bullet.height / 2;
+                            
+                            
+                            ctx.fillStyle = 'rgba(255, 100, 0, 0.6)';
+                            ctx.beginPath();
+                            ctx.arc(explosionX, explosionY, explosionRadius, 0, Math.PI * 2);
+                            ctx.fill();
+                            
+                            enemies.forEach((nearbyEnemy, nearbyIndex) => {
+                                const dx = (nearbyEnemy.x + nearbyEnemy.width / 2) - explosionX;
+                                const dy = (nearbyEnemy.y + nearbyEnemy.height / 2) - explosionY;
+                                const distance = Math.sqrt(dx * dx + dy * dy);
+                                
+                                if (distance < explosionRadius) {
+                                    spawnPowerup(nearbyEnemy.x + nearbyEnemy.width / 2, nearbyEnemy.y + nearbyEnemy.height / 2);
+                                    score += nearbyEnemy.points;
+                                    enemies.splice(nearbyIndex, 1);
+                                }
+                            });
+                            
+                            updateUI();
+                            checkRoundComplete();
+                            return;
+                        }
+                        
+                        
                         if (enemy.type === 'grey') {
                             enemy.health--;
                             if (enemy.health <= 0) {
@@ -597,6 +872,7 @@
                                 enemies.splice(enemyIndex, 1);
                                 score += enemy.points;
                                 updateUI();
+                                checkRoundComplete();
                             }
                         } else {
                             
@@ -605,6 +881,7 @@
                             enemies.splice(enemyIndex, 1);
                             score += enemy.points;
                             updateUI();
+                            checkRoundComplete();
                         }
                     }
                 });
@@ -614,9 +891,9 @@
             if (!activePowerups.shield) {
                 enemies.forEach((enemy, index) => {
                     if (player.x < enemy.x + enemy.width &&
-                        player.x + player.width > enemy.x &&
+                        player.x + player.width * playerSizeMultiplier > enemy.x &&
                         player.y < enemy.y + enemy.height &&
-                        player.y + player.height > enemy.y) {
+                        player.y + player.height * playerSizeMultiplier > enemy.y) {
                         
                         
                         if (enemy.type === 'pink') {
@@ -634,15 +911,13 @@
                 });
             }
             
-            
             if (!activePowerups.shield) {
                 enemyBullets.forEach((bullet, index) => {
-                    if (bullet.x < player.x + player.width &&
+                    if (bullet.x < player.x + player.width * playerSizeMultiplier &&
                         bullet.x + bullet.width > player.x &&
-                        bullet.y < player.y + player.height &&
+                        bullet.y < player.y + player.height * playerSizeMultiplier &&
                         bullet.y + bullet.height > player.y) {
                         enemyBullets.splice(index, 1);
-                        
                         
                         const damage = bullet.damage || 1;
                         lives -= damage;
@@ -658,15 +933,29 @@
             
             powerups.forEach((powerup, index) => {
                 if (player.x < powerup.x + powerupSize &&
-                    player.x + player.width > powerup.x - powerupSize &&
+                    player.x + player.width * playerSizeMultiplier > powerup.x - powerupSize &&
                     player.y < powerup.y + powerupSize &&
-                    player.y + player.height > powerup.y - powerupSize) {
+                    player.y + player.height * playerSizeMultiplier > powerup.y - powerupSize) {
                     powerups.splice(index, 1);
                     
                     const duration = powerup.type === 'barrier' ? 15000 : 10000;
                     activePowerups[powerup.type] = Date.now() + duration;
                 }
             });
+        }
+        
+        function checkRoundComplete() {
+            
+            const killsThisRound = Math.floor(score / 100);
+            if (killsThisRound > roundNumber) {
+                roundNumber = killsThisRound;
+                if (roundNumber === 1 || (roundNumber - 1) % 2 === 0) {
+                    
+                    if (obtainedUpgrades.length < availableUpgrades.length) {
+                        showUpgradeScreen();
+                    }
+                }
+            }
         }
 
         function updateUI() {
@@ -726,12 +1015,29 @@
             player.x = canvas.width / 2 - 20;
             player.y = canvas.height - 80;
             gameTime = 0;
-            gameRunning = false;
-            gameStarted = false;
+            roundNumber = 0;
+            obtainedUpgrades = [];
+            fireRateMultiplier = 1;
+            playerSizeMultiplier = 1;
+            hasMinions = false;
+            hasGrenades = false;
+            hasCommander = false;
+            shootDirection = { x: 0, y: -1 };
+            
             document.getElementById('gameOver').style.display = 'none';
-            document.getElementById('titleScreen').style.display = 'flex';
-            document.getElementById('quitBtn').classList.remove('show');
+            
+            
+            document.getElementById('legend-yellow').classList.add('locked');
+            document.getElementById('legend-darkBlue').classList.add('locked');
+            document.getElementById('legend-green').classList.add('locked');
+            document.getElementById('legend-grey').classList.add('locked');
+            document.getElementById('legend-pink').classList.add('locked');
+            document.getElementById('legend-purple').classList.add('locked');
+            
             updateUI();
+            
+            
+            showUpgradeScreen();
         }
 
         function gameLoop() {
